@@ -1,10 +1,12 @@
 """One-dimensional kernel density estimate plots."""
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import gaussian, convolve, convolve2d  # pylint: disable=no-name-in-module
 from scipy.sparse import coo_matrix
 from scipy.stats import entropy
-
+import xarray as xr
+from ..data.inference_data import InferenceData
 from ..utils import conditional_jit
 from .plot_utils import _scale_fig_size
 
@@ -146,6 +148,14 @@ def plot_kde(
 
     figsize, *_, xt_labelsize, linewidth, markersize = _scale_fig_size(figsize, textsize, 1, 1)
 
+    if isinstance(values, xr.Dataset):
+        raise ValueError(
+            "Xarray dataset object detected.Use plot_posterior, plot_density, plot_joint"
+            "or plot_pair instead of plot_kde"
+        )
+    if isinstance(values, InferenceData):
+        raise ValueError(" Inference Data object detected. Use plot_posterior instead of plot_kde")
+
     if values2 is None:
         if plot_kwargs is None:
             plot_kwargs = {}
@@ -267,6 +277,10 @@ def _fast_kde(x, cumulative=False, bw=4.5, xmin=None, xmax=None):
     """
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x)]
+    if x.size == 0:
+        warnings.warn("kde plot failed, you may want to check your data")
+        return np.array([np.nan]), np.nan, np.nan
+
     len_x = len(x)
     n_points = 200 if (xmin or xmax) is None else 500
 
@@ -281,6 +295,10 @@ def _fast_kde(x, cumulative=False, bw=4.5, xmin=None, xmax=None):
     std_x = entropy(x - xmin) * bw
 
     n_bins = min(int(len_x ** (1 / 3) * std_x * 2), n_points)
+    if n_bins < 2:
+        warnings.warn("kde plot failed, you may want to check your data")
+        return np.array([np.nan]), np.nan, np.nan
+
     d_x = (xmax - xmin) / (n_bins - 1)
     grid = _histogram(x, n_bins, range_hist=(xmin, xmax))
 

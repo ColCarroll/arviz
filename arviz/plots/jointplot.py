@@ -2,8 +2,9 @@
 import matplotlib.pyplot as plt
 
 from ..data import convert_to_dataset
+from .distplot import plot_dist
 from .kdeplot import plot_kde
-from .plot_utils import _scale_fig_size, get_bins, xarray_var_iter, make_label, get_coords
+from .plot_utils import _scale_fig_size, xarray_var_iter, make_label, get_coords
 from ..utils import _var_names
 
 
@@ -56,6 +57,44 @@ def plot_joint(
     axjoin : matplotlib axes, join (central) distribution
     ax_hist_x : matplotlib axes, x (top) distribution
     ax_hist_y : matplotlib axes, y (right) distribution
+
+    Examples
+    --------
+    Scatter Joint plot
+
+    .. plot::
+        :context: close-figs
+
+        >>> import arviz as az
+        >>> data = az.load_arviz_data('non_centered_eight')
+        >>> az.plot_joint(data,
+        >>>             var_names=['theta'],
+        >>>             coords={'school': ['Choate', 'Phillips Andover']},
+        >>>             kind='scatter',
+        >>>             figsize=(6, 6))
+
+    Hexbin Joint plot
+
+    .. plot::
+        :context: close-figs
+
+        >>> az.plot_joint(data,
+        >>>             var_names=['theta'],
+        >>>             coords={'school': ['Choate', 'Phillips Andover']},
+        >>>             kind='hexbin',
+        >>>             figsize=(6, 6))
+
+    KDE Joint plot
+
+    .. plot::
+        :context: close-figs
+
+        >>> az.plot_joint(data,
+        >>>                 var_names=['theta'],
+        >>>                 coords={'school': ['Choate', 'Phillips Andover']},
+        >>>                 kind='kde',
+        >>>                 figsize=(6, 6))
+
     """
     valid_kinds = ["scatter", "kde", "hexbin"]
     if kind not in valid_kinds:
@@ -84,6 +123,8 @@ def plot_joint(
 
     if marginal_kwargs is None:
         marginal_kwargs = {}
+    marginal_kwargs.setdefault("plot_kwargs", {})
+    marginal_kwargs["plot_kwargs"]["linewidth"] = linewidth
 
     # Instantiate figure and grid
     fig, _ = plt.subplots(0, 0, figsize=figsize, constrained_layout=True)
@@ -122,19 +163,8 @@ def plot_joint(
         axjoin.hexbin(x, y, mincnt=1, gridsize=gridsize, **joint_kwargs)
         axjoin.grid(False)
 
-    for val, ax, orient, rotate in (
-        (x, ax_hist_x, "vertical", False),
-        (y, ax_hist_y, "horizontal", True),
-    ):
-        if val.dtype.kind == "i":
-            bins = get_bins(val)
-            ax.hist(
-                val, bins=bins, align="left", density=True, orientation=orient, **marginal_kwargs
-            )
-        else:
-            marginal_kwargs.setdefault("plot_kwargs", {})
-            marginal_kwargs["plot_kwargs"]["linewidth"] = linewidth
-            plot_kde(val, rotated=rotate, ax=ax, **marginal_kwargs)
+    for val, ax, rotate in ((x, ax_hist_x, False), (y, ax_hist_y, True)):
+        plot_dist(val, textsize=xt_labelsize, rotated=rotate, ax=ax, **marginal_kwargs)
 
     ax_hist_x.set_xlim(axjoin.get_xlim())
     ax_hist_y.set_ylim(axjoin.get_ylim())

@@ -7,8 +7,7 @@ import numpy as np
 import pytest
 import pymc3 as pm
 
-
-from ..data import from_dict, from_pymc3
+from ..data import from_dict, from_pymc3, load_arviz_data
 from ..stats import compare, psislw
 from .helpers import eight_schools_params, load_cached_models  # pylint: disable=unused-import
 from ..plots import (
@@ -28,6 +27,8 @@ from ..plots import (
     _fast_kde,
     plot_khat,
     plot_hpd,
+    plot_dist,
+    plot_rank,
 )
 
 np.random.seed(0)
@@ -285,12 +286,43 @@ def test_plot_kde_cumulative(continuous_model, kwargs):
     assert axes
 
 
+@pytest.mark.parametrize("kwargs", [{"kind": "hist"}, {"kind": "dist"}])
+def test_plot_dist(continuous_model, kwargs):
+    axes = plot_dist(continuous_model["x"], **kwargs)
+    assert axes
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"plot_kwargs": {"linestyle": "-"}},
+        {"contour": True, "fill_last": False},
+        {"contour": False},
+    ],
+)
+def test_plot_dist_2d_kde(continuous_model, kwargs):
+    axes = plot_dist(continuous_model["x"], continuous_model["y"], **kwargs)
+    assert axes
+
+
 @pytest.mark.parametrize(
     "kwargs", [{"plot_kwargs": {"linestyle": "-"}}, {"cumulative": True}, {"rug": True}]
 )
 def test_plot_kde_quantiles(continuous_model, kwargs):
     axes = plot_kde(continuous_model["x"], **kwargs)
     assert axes
+
+
+def test_plot_kde_inference_data():
+    """
+    Ensure that an exception is raised when plot_kde
+    is used with an inference data or Xarray dataset object.
+    """
+    eight = load_arviz_data("centered_eight")
+    with pytest.raises(ValueError, match="Inference Data"):
+        plot_kde(eight)
+    with pytest.raises(ValueError, match="Xarray"):
+        plot_kde(eight.posterior)
 
 
 def test_plot_khat():
@@ -334,7 +366,7 @@ def test_plot_khat():
 def test_plot_pair(models, model_fit, kwargs):
     obj = getattr(models, model_fit)
     ax = plot_pair(obj, **kwargs)
-    assert ax
+    assert np.all(ax)
 
 
 @pytest.mark.parametrize(
@@ -583,6 +615,23 @@ def test_plot_autocorr_var_names(models, var_names):
     [
         {},
         {"var_names": "mu"},
+        {"var_names": ("mu", "tau"), "coords": {"theta_dim_0": [0, 1]}},
+        {"var_names": "mu", "ref_line": True},
+        {"var_names": "mu", "ref_line": False},
+    ],
+)
+@pytest.mark.parametrize("model_fit", ["pymc3_fit", "stan_fit", "pyro_fit"])
+def test_plot_rank(models, model_fit, kwargs):
+    obj = getattr(models, model_fit)
+    axes = plot_rank(obj, **kwargs)
+    assert axes.shape
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"var_names": "mu"},
         {"var_names": ("mu", "tau")},
         {"rope": (-2, 2)},
         {"rope": {"mu": [{"rope": (-2, 2)}], "theta": [{"school": "Choate", "rope": (2, 4)}]}},
@@ -684,7 +733,7 @@ def test_plot_hpd(models, model_fit, data, kwargs):
 def test_fast_kde_scipy(limits):
     data = np.random.normal(0, 1, 1000)
     if limits[0] is None:
-        x = np.linspace(data.min(), data.max(), 200)
+        x = np.linspace(data.min(), data.max(), 200)  # pylint: disable=no-member
     else:
         x = np.linspace(*limits, 500)
     density = gaussian_kde(data).evaluate(x)

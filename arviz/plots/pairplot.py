@@ -68,6 +68,45 @@ def plot_pair(
     Returns
     -------
     ax : matplotlib axes
+
+    Examples
+    --------
+    KDE Pair Plot
+
+    .. plot::
+        :context: close-figs
+
+        >>> import arviz as az
+        >>> centered = az.load_arviz_data('centered_eight')
+        >>> coords = {'school': ['Choate', 'Deerfield']}
+        >>> az.plot_pair(centered,
+        >>>             var_names=['theta', 'mu', 'tau'],
+        >>>             kind='kde',
+        >>>             coords=coords,
+        >>>             divergences=True,
+        >>>             textsize=18)
+
+    Hexbin pair plot
+
+    .. plot::
+        :context: close-figs
+
+        >>> az.plot_pair(centered,
+        >>>             var_names=['theta', 'mu'],
+        >>>             coords=coords,
+        >>>             textsize=18,
+        >>>             kind='hexbin')
+
+    Pair plot showing divergences
+
+    .. plot::
+        :context: close-figs
+
+        >>> az.plot_pair(centered,
+        ...             var_names=['theta', 'mu', 'tau'],
+        ...             coords=coords,
+        ...             divergences=True,
+        ...             textsize=18)
     """
     valid_kinds = ["scatter", "kde", "hexbin"]
     if kind not in valid_kinds:
@@ -116,7 +155,7 @@ def plot_pair(
     if numvars < 2:
         raise Exception("Number of variables to be plotted must be 2 or greater.")
 
-    elif numvars == 2:
+    if numvars == 2:
         (figsize, ax_labelsize, _, xt_labelsize, _, _) = _scale_fig_size(
             figsize, textsize, numvars - 1, numvars - 1
         )
@@ -153,7 +192,6 @@ def plot_pair(
         ax.set_xlabel("{}".format(flat_var_names[0]), fontsize=ax_labelsize, wrap=True)
         ax.set_ylabel("{}".format(flat_var_names[1]), fontsize=ax_labelsize, wrap=True)
         ax.tick_params(labelsize=xt_labelsize)
-        axs = ax
 
     else:
         (figsize, ax_labelsize, _, xt_labelsize, _, _) = _scale_fig_size(
@@ -164,7 +202,6 @@ def plot_pair(
             fig, ax = plt.subplots(
                 numvars - 1, numvars - 1, figsize=figsize, constrained_layout=True
             )
-        axs = []
         hexbin_values = []
         for i in range(0, numvars - 1):
             var1 = _posterior[i]
@@ -215,6 +252,5 @@ def plot_pair(
                     )
 
                 ax[j, i].tick_params(labelsize=xt_labelsize)
-                axs.append(ax)
 
-    return axs
+    return ax
